@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+
+	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 )
 
 type Post struct {
@@ -13,6 +15,10 @@ type Post struct {
 	Title struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
+
+	Content struct {
+		Rendered string `json:"rendered"`
+	} `json:"content"`
 
 	Categories []int `json:"categories"`
 }
@@ -42,6 +48,17 @@ func main() {
 	}
 
 	for _, post := range posts {
+		if post.ID != 113 {
+			continue
+		}
+
+		markdown, err := md.ConvertString(post.Content.Rendered)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(markdown)
+
 		fmt.Printf("%d\t%s\n", post.ID, post.Title.Rendered)
 		for _, categoryID := range post.Categories {
 			fmt.Printf(" - %s\n", categoryNames[categoryID])
