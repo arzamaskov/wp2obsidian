@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	md "github.com/JohannesKaufmann/html-to-markdown/v2"
+	"github.com/PuerkitoBio/goquery"
 )
 
 type Post struct {
@@ -57,21 +58,26 @@ func main() {
 			continue
 		}
 
-		markdown, err := md.ConvertString(post.Content.Rendered)
+		html, err := localizeImages(post.Content.Rendered, "output")
+		if err != nil {
+			panic(err)
+		}
+
+		markdown, err := md.ConvertString(html)
 		if err != nil {
 			panic(err)
 		}
 
 		fmt.Println(markdown)
-		path, err := downloadImage(
-			"http://10.195.7.71/wiki/wp-content/uploads/2020/04/1-1.png",
-			"output",
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Println(path)
+		// path, err := downloadImage(
+		// 	"http://10.195.7.71/wiki/wp-content/uploads/2020/04/1-1.png",
+		// 	"output",
+		// )
+		// if err != nil {
+		// 	panic(err)
+		// }
+		//
+		// fmt.Println(path)
 
 		fmt.Printf("%d\t%s\n", post.ID, post.Title.Rendered)
 		for _, categoryID := range post.Categories {
@@ -199,4 +205,46 @@ func downloadImage(imageURL, outputDir string) (string, error) {
 	}
 
 	return filepath.Join("attachments", name), nil
+}
+
+func localizeImages(html, outputDir string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return "", err
+	}
+
+	var firstErr error
+
+	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
+		if firstErr != nil {
+			return
+		}
+
+		src, ok := s.Attr("src")
+		if !ok {
+			return
+		}
+
+		localPath, err := downloadImage(src, outputDir)
+		if err != nil {
+			firstErr = err
+			return
+		}
+
+		s.SetAttr("src", localPath)
+
+		s.RemoveAttr("srcset")
+		s.RemoveAttr("sizes")
+	})
+
+	if firstErr != nil {
+		return "", firstErr
+	}
+
+	result, err := doc.Find("body").Html()
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
