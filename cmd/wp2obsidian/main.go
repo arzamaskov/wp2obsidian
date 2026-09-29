@@ -63,27 +63,27 @@ func main() {
 	}
 
 	for _, post := range posts {
-		if post.ID != 113 {
-			continue
-		}
-
 		html, err := localizeLinks(post.Content.Rendered, postFiles)
 		if err != nil {
-			panic(err)
+			fmt.Printf("post %d %q: localize links: %v\n", post.ID, post.Title.Rendered, err)
+			continue
 		}
 
 		html, err = localizeImages(post.Content.Rendered, "output")
 		if err != nil {
-			panic(err)
+			fmt.Printf("post %d %q: localize images: %v\n", post.ID, post.Title.Rendered, err)
+			continue
 		}
 
 		markdown, err := md.ConvertString(html)
 		if err != nil {
-			panic(err)
+			fmt.Printf("post %d %q: convert markdown: %v\n", post.ID, post.Title.Rendered, err)
+			continue
 		}
 
 		if err := savePost(post, markdown, "output", categoryNames); err != nil {
-			panic(err)
+			fmt.Printf("post %d %q: save: %v\n", post.ID, post.Title.Rendered, err)
+			continue
 		}
 	}
 }
