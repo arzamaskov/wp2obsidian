@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -55,12 +56,23 @@ func main() {
 		panic(err)
 	}
 
+	postFiles := make(map[int]string, len(posts))
+	for _, post := range posts {
+		title := html.UnescapeString(post.Title.Rendered)
+		postFiles[post.ID] = sanitizeFilename(title) + ".md"
+	}
+
 	for _, post := range posts {
 		if post.ID != 113 {
 			continue
 		}
 
-		html, err := localizeImages(post.Content.Rendered, "output")
+		html, err := localizeLinks(post.Content.Rendered, postFiles)
+		if err != nil {
+			panic(err)
+		}
+
+		html, err = localizeImages(post.Content.Rendered, "output")
 		if err != nil {
 			panic(err)
 		}
@@ -288,4 +300,56 @@ func buildFrontmatter(post Post, categoryNames map[int]string) string {
 	b.WriteString("---\n\n")
 
 	return b.String()
+}
+
+func wordpressPostID(href string) (int, bool) {
+	u, err := url.Parse(href)
+	if err != nil {
+		return 0, false
+	}
+
+	id := u.Query().Get("p")
+	if id == "" {
+		return 0, false
+	}
+
+	postID, err := strconv.Atoi(id)
+	if err != nil {
+		return 0, false
+	}
+
+	return postID, true
+}
+
+func localizeLinks(html string, postFiles map[int]string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return "", err
+	}
+
+	doc.Find("a").Each(func(_ int, s *goquery.Selection) {
+		href, ok := s.Attr("href")
+		if !ok {
+			return
+		}
+
+		postID, ok := wordpressPostID(href)
+		if !ok {
+			return
+		}
+
+		filename, ok := postFiles[postID]
+		if !ok {
+			return
+		}
+
+		s.SetAttr("href", filename)
+	})
+
+	result, err := doc.Find("body").Html()
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
