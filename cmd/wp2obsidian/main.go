@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 )
@@ -129,4 +131,23 @@ func fetchCategories(baseURL string) ([]Category, error) {
 	}
 
 	return categories, nil
+}
+
+func attachmentName(imageURL string) (string, error) {
+	u, err := url.Parse(imageURL)
+	if err != nil {
+		return "", err
+	}
+
+	const prefix = "/wp-content/uploads/"
+
+	idx := strings.Index(u.Path, prefix)
+	if idx == -1 {
+		return "", fmt.Errorf("unexpected image path: %s", u.Path)
+	}
+
+	path := strings.TrimPrefix(u.Path[idx:], prefix)
+	name := strings.ReplaceAll(path, "/", "-")
+
+	return name, nil
 }
