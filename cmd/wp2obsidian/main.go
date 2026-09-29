@@ -16,7 +16,9 @@ import (
 )
 
 type Post struct {
-	ID int `json:"id"`
+	ID       int    `json:"id"`
+	Date     string `json:"date"`
+	Modified string `json:"modified"`
 
 	Title struct {
 		Rendered string `json:"rendered"`
@@ -68,7 +70,7 @@ func main() {
 			panic(err)
 		}
 
-		if err := savePost(post, markdown, "output"); err != nil {
+		if err := savePost(post, markdown, "output", categoryNames); err != nil {
 			panic(err)
 		}
 	}
@@ -167,7 +169,7 @@ func downloadImage(imageURL, outputDir string) (string, error) {
 	attachmentsDir := filepath.Join(outputDir, "attachments")
 
 	if err := os.MkdirAll(attachmentsDir, 0o755); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	resp, err := http.Get(imageURL)
@@ -237,7 +239,11 @@ func localizeImages(html, outputDir string) (string, error) {
 	return result, nil
 }
 
-func savePost(post Post, markdown, outputDir string) error {
+func savePost(
+	post Post,
+	markdown, outputDir string,
+	categoryNames map[int]string,
+) error {
 	articleDir := filepath.Join(outputDir, "articles")
 
 	if err := os.MkdirAll(articleDir, 0o755); err != nil {
@@ -246,8 +252,9 @@ func savePost(post Post, markdown, outputDir string) error {
 
 	filename := sanitizeFilename(post.Title.Rendered) + ".md"
 	path := filepath.Join(articleDir, filename)
+	content := buildFrontmatter(post, categoryNames) + markdown
 
-	return os.WriteFile(path, []byte(markdown), 0o644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func sanitizeFilename(name string) string {
@@ -258,4 +265,27 @@ func sanitizeFilename(name string) string {
 	)
 
 	return strings.TrimSpace(replacer.Replace(name))
+}
+
+func buildFrontmatter(post Post, categoryNames map[int]string) string {
+	var b strings.Builder
+
+	b.WriteString("---\n")
+	fmt.Fprintf(&b, "wordpress_id: %d\n", post.ID)
+	fmt.Fprintf(&b, "created: %s\n", post.Date)
+	fmt.Fprintf(&b, "modified: %s\n", post.Modified)
+
+	if len(post.Categories) > 0 {
+		b.WriteString("categories:\n")
+
+		for _, id := range post.Categories {
+			if name, ok := categoryNames[id]; ok {
+				fmt.Fprintf(&b, "  - %q\n", name)
+			}
+		}
+	}
+
+	b.WriteString("---\n\n")
+
+	return b.String()
 }
