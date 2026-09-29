@@ -69,7 +69,7 @@ func main() {
 			continue
 		}
 
-		html, err = localizeImages(post.Content.Rendered, "output")
+		html, err = localizeImages(post.Content.Rendered, baseURL, "output")
 		if err != nil {
 			fmt.Printf("post %d %q: localize images: %v\n", post.ID, post.Title.Rendered, err)
 			continue
@@ -160,19 +160,34 @@ func attachmentName(imageURL string) (string, error) {
 	}
 
 	const prefix = "/wp-content/uploads/"
+	var path string
 
-	idx := strings.Index(u.Path, prefix)
-	if idx == -1 {
-		return "", fmt.Errorf("unexpected image path: %s", u.Path)
+	if idx := strings.Index(u.Path, prefix); idx != -1 {
+		path = strings.TrimPrefix(u.Path[idx:], prefix)
+	} else {
+		path = strings.TrimPrefix(u.Path, "/")
 	}
 
-	path := strings.TrimPrefix(u.Path[idx:], prefix)
-	name := strings.ReplaceAll(path, "/", "-")
+	if path == "" {
+		return "", fmt.Errorf("empty image path: %s", imageURL)
+	}
 
-	return name, nil
+	return strings.ReplaceAll(path, "/", "-"), nil
 }
 
-func downloadImage(imageURL, outputDir string) (string, error) {
+func downloadImage(imageURL, baseURL, outputDir string) (string, error) {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	ref, err := url.Parse(imageURL)
+	if err != nil {
+		return "", err
+	}
+
+	imageURL = base.ResolveReference(ref).String()
+
 	name, err := attachmentName(imageURL)
 	if err != nil {
 		return "", err
@@ -209,7 +224,7 @@ func downloadImage(imageURL, outputDir string) (string, error) {
 	return filepath.Join("attachments", name), nil
 }
 
-func localizeImages(html, outputDir string) (string, error) {
+func localizeImages(html, baseURL, outputDir string) (string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return "", err
@@ -227,9 +242,9 @@ func localizeImages(html, outputDir string) (string, error) {
 			return
 		}
 
-		localPath, err := downloadImage(src, outputDir)
+		localPath, err := downloadImage(src, baseURL, outputDir)
 		if err != nil {
-			firstErr = err
+			fmt.Printf("warning: image %q: %v\n", src, err)
 			return
 		}
 
