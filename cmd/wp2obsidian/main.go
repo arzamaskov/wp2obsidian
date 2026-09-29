@@ -3,8 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -60,6 +63,15 @@ func main() {
 		}
 
 		fmt.Println(markdown)
+		path, err := downloadImage(
+			"http://10.195.7.71/wiki/wp-content/uploads/2020/04/1-1.png",
+			"output",
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(path)
 
 		fmt.Printf("%d\t%s\n", post.ID, post.Title.Rendered)
 		for _, categoryID := range post.Categories {
@@ -150,4 +162,41 @@ func attachmentName(imageURL string) (string, error) {
 	name := strings.ReplaceAll(path, "/", "-")
 
 	return name, nil
+}
+
+func downloadImage(imageURL, outputDir string) (string, error) {
+	name, err := attachmentName(imageURL)
+	if err != nil {
+		return "", err
+	}
+
+	attachmentsDir := filepath.Join(outputDir, "attachments")
+
+	if err := os.MkdirAll(attachmentsDir, 0o755); err != nil {
+		return "", nil
+	}
+
+	resp, err := http.Get(imageURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	path := filepath.Join(attachmentsDir, name)
+
+	file, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, resp.Body); err != nil {
+		return "", err
+	}
+
+	return filepath.Join("attachments", name), nil
 }
