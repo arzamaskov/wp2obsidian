@@ -68,20 +68,8 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Println(markdown)
-		// path, err := downloadImage(
-		// 	"http://10.195.7.71/wiki/wp-content/uploads/2020/04/1-1.png",
-		// 	"output",
-		// )
-		// if err != nil {
-		// 	panic(err)
-		// }
-		//
-		// fmt.Println(path)
-
-		fmt.Printf("%d\t%s\n", post.ID, post.Title.Rendered)
-		for _, categoryID := range post.Categories {
-			fmt.Printf(" - %s\n", categoryNames[categoryID])
+		if err := savePost(post, markdown, "output"); err != nil {
+			panic(err)
 		}
 	}
 }
@@ -247,4 +235,27 @@ func localizeImages(html, outputDir string) (string, error) {
 	}
 
 	return result, nil
+}
+
+func savePost(post Post, markdown, outputDir string) error {
+	articleDir := filepath.Join(outputDir, "articles")
+
+	if err := os.MkdirAll(articleDir, 0o755); err != nil {
+		return err
+	}
+
+	filename := sanitizeFilename(post.Title.Rendered) + ".md"
+	path := filepath.Join(articleDir, filename)
+
+	return os.WriteFile(path, []byte(markdown), 0o644)
+}
+
+func sanitizeFilename(name string) string {
+	replacer := strings.NewReplacer(
+		"/", "-",
+		"\\", "-",
+		":", "-",
+	)
+
+	return strings.TrimSpace(replacer.Replace(name))
 }
